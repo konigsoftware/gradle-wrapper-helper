@@ -1,0 +1,115 @@
+#!/bin/bash
+
+#
+# This is a helper script to make running ./gradlew a bit nicer.
+#
+# To install:
+#
+#   `./gw install`
+#
+#   Note that this will allow you to use `gradlew` from any local gradle project
+#
+# To use:
+#
+#   `gw [cmd]` instead of `./gradlew [cmd]` and from any directory in a gradle project.
+#
+#   For example, if your project is structured like:
+#   root:
+#     gradlew
+#     some-module:
+#       some-sub-module:
+#         even-deeper-submodule:
+#           src/main/...
+#           build.gradle
+#
+#   You can just run `gw [cmd]` from `root/some-module/some-sub-module/even-deeper-submodule` instead of `../../../gradlew [cmd]`
+#
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+# this is where the script will be installed
+PATH_TO_GW="$HOME/bin/gw"
+
+if [ "$1" == "install" ]; then
+    #
+    # Handle the installation case
+    #
+    echo "Installing gw..."
+
+    # Find the right .*rc file to update
+    PATH_TO_RC="$HOME/.zshrc"
+    if [ ! -f "$PATH_TO_RC" ]; then
+        PATH_TO_RC="$HOME/.bashrc"
+    fi
+    if [ ! -f "$PATH_TO_RC" ]; then
+        echo "${RED}Error: cannot find ~/.zshrc or ~/.bashrc${NC}"
+        exit 1
+    fi
+
+    # cd in to gw script dir
+    SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+    pushd "$SCRIPT_DIR" >/dev/null || exit 1
+
+    # copy bin to local bin dir
+    mkdir -p "$HOME/bin"
+    if [ -f "$PATH_TO_GW" ]; then
+        echo "Overwriting previous version of gw in ~/bin"
+    fi
+    cp gw "$PATH_TO_GW"
+
+    # update PATH if not already contained
+    if grep -q 'alias gw=' "$PATH_TO_RC"; then
+        echo "$PATH_TO_RC already setup, skipping."
+    else
+        echo "Updating $PATH_TO_RC"
+        # shellcheck disable=SC2129
+        echo '' >> "$PATH_TO_RC" # empty line
+        echo '# Gradlew wrapper alias' >> "$PATH_TO_RC"
+        echo 'alias gw="'"$PATH_TO_GW"'"' >> "$PATH_TO_RC"
+    fi
+
+    popd >/dev/null || exit 1
+
+    echo -e "${GREEN}gw install complete!${NC}"
+    echo "  Remember: restart any open shells to use 'gw'."
+    echo "  Then: use 'gw [cmds...]' from any gradle project (sub)directory"
+    echo ""
+    exit 0
+elif [ ! -f "$PATH_TO_GW" ]; then
+    #
+    # Handle the "invalid arg, and not yet installed" case
+    #
+    echo ""
+    echo -e "${RED}Looks like you haven't installed the gw script yet.${NC}"
+    echo ""
+    echo "Usage: $ ./gw install    to install the script before using it"
+    echo "       $ gw [cmds...]    to use the script after install"
+    echo ""
+    exit 1
+else
+    #
+    # Usage after install, as a wrapper of gradlew
+    #
+    # Find gradlew binary. Assume we're in a sub-dir of a gradle project directory
+
+    pathToGradlew="gradlew"
+    depth=5 # support up to this many directories deep
+
+    while [ ! -f "$pathToGradlew" ] && [ "$depth" -gt 0 ]; do
+        pathToGradlew="../$pathToGradlew"
+        depth=$((depth - 1))
+    done
+
+    # Execute gradlew with args to this script
+    if [ -f "$pathToGradlew" ]; then
+        ./$pathToGradlew "$@"
+    else
+        echo ""
+        echo -e "${RED}Error: Could not find gradlew in the directory tree.${NC}"
+        echo "       Make sure you're executing 'gw' from within a gradle project."
+        echo ""
+        exit 1
+    fi
+fi
