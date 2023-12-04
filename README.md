@@ -30,6 +30,8 @@ Clone this repo to any local directory. `cd` into the cloned repository and run 
 
 If the installation succeeds, you should see `gw install complete!` in the console.
 
+You will need to restart your terminal following installation before usage.
+
 You can feel free to delete the cloned repository after installation has completed, although re-installation will require
 re-cloning this repo.
 
